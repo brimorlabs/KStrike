@@ -4,6 +4,7 @@
 Initially Developed January 30, 2021
 
 Updates
+2021-06-24 - Added Python3 support
 2021-04-26 - Added two new GUIDs to lookup table
 2021-02-23 - Built in logic to identify multi-year entries (abnormal, but it can happen)
 2021-02-13 - Processed DNS table (if available) and correlates hostname(s) to IPv4 addresses
@@ -62,7 +63,7 @@ from struct import unpack
 import time
 
 # Declared variables
-kstrikeversionnumber = "20210224" # KStrike Version number
+kstrikeversionnumber = "20210624" # KStrike Version number
 StartTime=time.time() # Recording the start time
 insertdatefourofyear = [] # We will use this later
 insertdateyyyymmdd = [] # We will use this later
@@ -152,15 +153,16 @@ def Check_Column_Type(Table_Record, Column_Type, Column_Number, Record_List): #A
           sys.stdout.write("NO BINARY_DATA_TO_HEX||NO BINARY_DATA_TO_HEX||") #Writing data out if the loop doesn't work. Including the statement, just to make sure
        else:
           hexdb=binascii.hexlify(Table_Record.get_value_data(Column_Number)) #Turning the binary data to hex
+          macaddress=hexdb.decode('utf-8', 'ignore') 
           if ((len(hexdb) <= 8) and Column_Name == "Address"): #Checking to see what the hex length is, and doing the needed conversion to IP addresses here 
               if (len(hexdb)< 8):  #A check to help ensure length is right
                   hexdb = ''.join(('0',hexdb)) #Adding zeros to make sure everything is correct
               ipaddr = "%i.%i.%i.%i" % (int(hexdb[0:2],16),int(hexdb[2:4],16),int(hexdb[4:6],16),int(hexdb[6:8],16)) #Proper formatting
               raw_ipaddr_correlations = DNS_Dict.get(ipaddr, "No Match for IP address found") #Looking up value-key in DNS_Dict dictionary file above
-              ipaddr_correlations = str(raw_ipaddr_correlations).strip("[]") #Removing brackets              
-              sys.stdout.write(str(hexdb)+"||"+str(ipaddr)+" ("+str(ipaddr_correlations)+")||") #Writing raw address and converted address to stdout
-          elif (((hexdb[:4] == "fe80") or (hexdb[:4] == "2001")) and (Column_Name == "Address") and (len(hexdb) == 32)): # A couple of checks for the IPV6 address formatting. So far have only seen fe80 and 2001, there may be more
-              colonaddedtohexdb = ':'.join(hexdb[i:i + 4] for i in range(0, len(hexdb), 4)) #Adding colons to the IPV6 address
+              ipaddr_correlations = str(raw_ipaddr_correlations).strip("[]") #Removing brackets
+              sys.stdout.write(str(macaddress).upper()+"||"+str(ipaddr)+" ("+str(ipaddr_correlations)+")||") #Writing raw address and converted address to stdout
+          elif (((macaddress[:4] == "fe80") or (macaddress[:4] == "2001")) and (Column_Name == "Address") and (len(hexdb) == 32)): # A couple of checks for the IPV6 address formatting. So far have only seen fe80 and 2001, there may be more
+              colonaddedtohexdb = ':'.join(macaddress[i:i + 4] for i in range(0, len(macaddress), 4)) #Adding colons to the IPV6 address
               ipv6Parts = colonaddedtohexdb.split(":") #Splitting for future ease
               macParts = [] #Parts, to be used in the futre
               for ipv6Part in ipv6Parts[-4:]: #Looping, so we can build the ipv6 address
@@ -173,12 +175,12 @@ def Check_Column_Type(Table_Record, Column_Type, Column_Number, Record_List): #A
               del macParts[4] #Nope
               del macParts[3] #Nope again
               rawmacparts = ":".join(macParts) #More formatting
-              finalmac=str(rawmacparts).upper() #Upper case      
-              sys.stdout.write(str(hexdb)+"||"+str(colonaddedtohexdb)+" IPv6 MAC: "+str(finalmac)+"||") #Writing raw address and converted address to stdout
-          elif ( (str(hexdb) == "00000000000000000000000000000001") and (Column_Name == "Address") and (len(hexdb) == 32)): # A couple of checks for the IPV6 local host address formatting
-              sys.stdout.write(hexdb+"||Local Host ::1||") #Writing the data out if the address is local host IPv6
+              finalmac=str(rawmacparts).upper() #Upper case  
+              sys.stdout.write(str(macaddress).upper()+"||"+str(colonaddedtohexdb)+" IPv6 MAC: "+str(finalmac)+"||") #Writing raw address and converted address to stdout
+          elif ( (str(macaddress) == "00000000000000000000000000000001") and (Column_Name == "Address") and (len(hexdb) == 32)): # A couple of checks for the IPV6 local host address formatting
+              sys.stdout.write(str(macaddress).upper()+"||Local Host ::1||") #Writing the data out if the address is local host IPv6
           else:
-              sys.stdout.write(hexdb+"||Unable to convert data||") #Writing data out if the loop doesn't work. Including the statement, just to make sure
+              sys.stdout.write(str(macaddress).upper()+"||Unable to convert data||") #Writing data out if the loop doesn't work. Including the statement, just to make sure
     elif (Column_Type == 10): #TEXT	
        if (Table_Record.get_value_data(Column_Number) == None):
           return Record_List.append('')
@@ -196,21 +198,27 @@ def Check_Column_Type(Table_Record, Column_Type, Column_Number, Record_List): #A
           sys.stdout.write("<BLANK>||") #Printing the large text data
        elif ((Table_Record.get_value_data(Column_Number) == "\x00\x00") and (Column_Name == "AuthenticatedUserName")):
           sys.stdout.write("<BLANK>||") #Printing the large text data
+       elif ((Table_Record.get_value_data(Column_Number) == "") and (Column_Name == "AuthenticatedUserName")):
+          sys.stdout.write("<BLANK>||") #Printing the large text data
        elif ((Column_Name == "Address") and (Table_name == "DNS" )): #Pulling out IP address from DNS table
           global ip_address_from_dns #Declaring the global variable
-          raw_ip_address_from_dns = Table_Record.get_value_data(Column_Number) #Assigning the IP address to the variable
-          ip_address_from_dns = raw_ip_address_from_dns.replace('\x00','') #Removing \x00
+          ip_address_from_dns = Table_Record.get_value_data(Column_Number).decode('utf-16', 'ignore').replace('\x00', '') #Assigning the IP address to the variable
        elif ((Column_Name == "HostName") and (Table_name == "DNS" )): #Pulling out Hostname from DNS table
-          raw_hostname_from_dns = Table_Record.get_value_data(Column_Number) #Assigning the Hostname to the variable
-          hostname_from_dns = raw_hostname_from_dns.replace('\x00','') #Removing \x00
+          hostname_from_dns = Table_Record.get_value_data(Column_Number).decode('utf-16', 'ignore').replace('\x00', '') #Assigning the Hostname to the variable
           #sys.stdout.write("DNS IP Address is "+ip_address_from_dns+" hostname is "+str(hostname_from_dns)+"\r\n")
           if ip_address_from_dns in DNS_Dict: #Populating DNS_Dict dictionary varaiable
               DNS_Dict[str(ip_address_from_dns)].append(str(hostname_from_dns)) #Append if value is seen
           else:
               DNS_Dict[str(ip_address_from_dns)] = [str(hostname_from_dns)] #Create new pair if value is not seen
        else:
-          large_text = Table_Record.get_value_data(Column_Number)
-          sys.stdout.write(large_text+"||") #Printing the large text data
+          large_text = Table_Record.get_value_data(Column_Number).decode('utf-16', 'ignore')
+          lengthoflarge_text=len(large_text) #Computing the length, as another check
+          if ((lengthoflarge_text > 1) and (pythonversion == 2) ):
+            sys.stdout.write(large_text.encode('utf-8')+"||") #Printing the large text data if value is greater than 1
+          elif ((lengthoflarge_text > 1) and (pythonversion > 2) ):
+            sys.stdout.write(large_text+"||") #Printing the large text data if value is greater than 1
+          else:
+            sys.stdout.write("<BLANK>||") #Printing the large text data if value is not greater than 1
     elif (Column_Type == 13): #SUPER_LARGE_VALUE
        return Record_List.append(Table_Record.get_value_data_as_integer(Column_Number))	
     elif (Column_Type == 14): #INTEGER_32BIT_UNSIGNED	
@@ -227,7 +235,8 @@ def Check_Column_Type(Table_Record, Column_Type, Column_Number, Record_List): #A
        if (Table_Record.get_value_data(Column_Number) == None):
            sys.stdout.write("NO GUID DATA||") #Printing the string
        else:
-          orgguid = uuid.UUID(bytes_le=(str(Table_Record.get_value_data(Column_Number)))) #Turning the data into a GUID
+          uuid_Bytes = Table_Record.get_value_data(Column_Number)
+          orgguid = uuid.UUID(bytes_le=uuid_Bytes) #Turning the data into a GUID
           urnguid=orgguid.urn #Making the GUID easier to work with
           rawguid = urnguid[9:] #Stripping out unneeded formatting 
           ucrawguid=str(rawguid).upper() #Making it all upper case
@@ -275,6 +284,10 @@ if len(sys.argv) == 1:
     sys.stderr.write("Version "+str(kstrikeversionnumber)+"\r\n") #Writing version to STDERR
     sys.stderr.write("\r\nThis script will parse on-disk User Access Logging found on Windows Server 2012\r\nand later systems under the path \"\Windows\System32\LogFiles\SUM\"\r\nThe output is double pipe || delimited\r\n\r\n\r\nExample Usage: KStrike.py Current.mdb > SYSNAME_Current.txt\r\n\r\n") #Writing info to SDTERR
     sys.exit() #A nice clean exit
+#First, we figure the version of python we are runningif sys.version_info[0] < 3:    pythonversion=2
+else:
+    pythonversion=3
+sys.stderr.write("\r\nPython Version" +str(pythonversion)+" detected\r\n\r\n") #Writing info to SDTERR
 file_object = open(sys.argv[1], "rb") #Opening file
 esedb_file = pyesedb.file() #ESE db needed things
 esedb_file.open_file_object(file_object) #ESE db needed things
