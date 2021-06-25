@@ -13,7 +13,7 @@ This script will parse data from the User Access Logging files contained on Wind
 
 
 ### Usage 
-Run the script from the command line, afer you have extracted the database files from the SUM folder. This script is written for Python2. Python3 support is on the roadmap.
+Run the script from the command line, afer you have extracted the database files from the SUM folder. This script will work with Python 2 or Python 3. It has also been tested on the most recent SIFT workstation release
 
 ```
 This script will parse on-disk User Access Logging found on Windows Server 2012
