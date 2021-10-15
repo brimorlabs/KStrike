@@ -3,6 +3,9 @@
 '''
 Initially Developed January 30, 2021
 
+Added by Tim Taylor
+2021-##-## - Added optional file output, vs using a redirect
+
 Updates
 2021-06-24 - Added Python3 support
 2021-04-26 - Added two new GUIDs to lookup table
@@ -44,8 +47,11 @@ Many thanks to:
 - Mark McKinnon and Mark Baggett (for their work on SRUM parsing scripts which helped with ESE database/field structure
 - Microsoft reference material on this artifact: https://docs.microsoft.com/en-us/windows-server/administration/user-access-logging/manage-user-access-logging
 '''
+# Added by TT
+import pandas as pd
+from tabulate import tabulate
 
-
+# Original imports
 import pyesedb
 import sys
 import os
@@ -77,6 +83,14 @@ totalcountofaccesses = [] # We will use this later
 badyeardetector = [] # We will use this later as a check
 correlatedtwoaccessmismatchyear = "No" # We will use this later as a check
 
+# Added by TT
+
+header = ['Role', 'TenantId', 'TotalAccesses', 'InsertDate', 'LastAccess', 'RawAddress', 'Address_HostName', 'AuthenticatedUserName', 'DatesAndAccesses']
+df = pd.DataFrame(data=None, index=None, columns=header, dtype=None, copy=None) 
+series_list = list()
+dates_and_accesses = list()
+ip_address_from_dns = ''
+
 
 # Setup dictionary for column types
 Column_Dict = {0:'NULL', 1:'Text', 2:'Integer', 3:'Integer', 4:'Integer', 5:'Integer', 6:'Real', 7:'Real', 8:'Text', 9:'Blob', \
@@ -100,6 +114,9 @@ def win_date_bin_to_datetime(win_date_bin): #This converts the datetime field of
     except:
         windowsdt = "UNRECOGNIZED TIMESTAMP"
     sys.stdout.write(str(windowsdt)+"||")
+
+    series_list.append(str(windowsdt)) # TT 
+
     fourofyear=str(windowsdt)[0:4] #Pulling the four of the year
     fullyyyymmdd=str(windowsdt)[0:10] # Pulling the full yyyy-mm-dd
     twoofhour=str(windowsdt)[11:13] #Pulling the two of hour
@@ -122,103 +139,145 @@ def win_date_bin_to_datetime(win_date_bin): #This converts the datetime field of
 
 def Check_Column_Type(Table_Record, Column_Type, Column_Number, Record_List): #Add field clarity as needed, but most likely not needed
     if (Column_Type == 0):   # Null
-       return "NULL"
+        return "NULL"
     elif (Column_Type == 1): #Boolean
-       if (Table_Record.get_value_data(Column_Number) == None):
-          return Record_List.append('NULL')
-       else:
-          return Record_List.append(str(Table_Record.get_value_data(Column_Number).decode('utf-16', 'ignore')))	
+        if (Table_Record.get_value_data(Column_Number) == None):
+            return Record_List.append('NULL')
+        else:
+            return Record_List.append(str(Table_Record.get_value_data(Column_Number).decode('utf-16', 'ignore')))	
     elif (Column_Type == 2): #INTEGER_8BIT_UNSIGNED
-       return Record_List.append(Table_Record.get_value_data_as_integer(Column_Number))
+        return Record_List.append(Table_Record.get_value_data_as_integer(Column_Number))
     elif (Column_Type == 3): #INTEGER_16BIT_SIGNED
-       return Record_List.append(Table_Record.get_value_data_as_integer(Column_Number))	
+        return Record_List.append(Table_Record.get_value_data_as_integer(Column_Number))	
     elif (Column_Type == 4): #INTEGER_32BIT_SIGNED	
-       return Record_List.append(Table_Record.get_value_data_as_integer(Column_Number))
+        return Record_List.append(Table_Record.get_value_data_as_integer(Column_Number))
     elif (Column_Type == 5): #CURRENCY
-       return Record_List.append(Table_Record.get_value_data_as_integer(Column_Number))	
+        return Record_List.append(Table_Record.get_value_data_as_integer(Column_Number))	
     elif (Column_Type == 6): #INTEGER_8BIT_UNSIGNED
-       return Record_List.append(Table_Record.get_value_data_as_floating_point(Column_Number))
+        return Record_List.append(Table_Record.get_value_data_as_floating_point(Column_Number))
     elif (Column_Type == 7): #DOUBLE_64BIT
        return Record_List.append(Table_Record.get_value_data_as_floating_point(Column_Number))	
     elif (Column_Type == 8): #DATETIME	
-       #return Record_List.append(Table_Record.get_value_data_as_integer(Column_Number))	
-       if (Table_Record.get_value_data(Column_Number) == None):
-          return Record_List.append('')
-       elif (Table_name == "DNS" ): #Pulling out IP address from DNS table
-          return Record_List.append('')
-       else:
-          return Record_List.append(win_date_bin_to_datetime(Table_Record.get_value_data(Column_Number)))
+        #return Record_List.append(Table_Record.get_value_data_as_integer(Column_Number))	
+        if (Table_Record.get_value_data(Column_Number) == None):
+            return Record_List.append('')
+        elif (Table_name == "DNS" ): #Pulling out IP address from DNS table
+            return Record_List.append('')
+        else:
+            return Record_List.append(win_date_bin_to_datetime(Table_Record.get_value_data(Column_Number)))
     elif (Column_Type == 9): #BINARY_DATA_TO_HEX
-       if (Table_Record.get_value_data(Column_Number) == None):
-          sys.stdout.write("NO BINARY_DATA_TO_HEX||NO BINARY_DATA_TO_HEX||") #Writing data out if the loop doesn't work. Including the statement, just to make sure
-       else:
-          hexdb=binascii.hexlify(Table_Record.get_value_data(Column_Number)) #Turning the binary data to hex
-          macaddress=hexdb.decode('utf-8', 'ignore') 
-          if ((len(hexdb) <= 8) and Column_Name == "Address"): #Checking to see what the hex length is, and doing the needed conversion to IP addresses here 
-              if (len(hexdb)< 8):  #A check to help ensure length is right
-                  hexdb = ''.join(('0',hexdb)) #Adding zeros to make sure everything is correct
-              ipaddr = "%i.%i.%i.%i" % (int(hexdb[0:2],16),int(hexdb[2:4],16),int(hexdb[4:6],16),int(hexdb[6:8],16)) #Proper formatting
-              raw_ipaddr_correlations = DNS_Dict.get(ipaddr, "No Match for IP address found") #Looking up value-key in DNS_Dict dictionary file above
-              ipaddr_correlations = str(raw_ipaddr_correlations).strip("[]") #Removing brackets
-              sys.stdout.write(str(macaddress).upper()+"||"+str(ipaddr)+" ("+str(ipaddr_correlations)+")||") #Writing raw address and converted address to stdout
-          elif (((macaddress[:4] == "fe80") or (macaddress[:4] == "2001")) and (Column_Name == "Address") and (len(hexdb) == 32)): # A couple of checks for the IPV6 address formatting. So far have only seen fe80 and 2001, there may be more
-              colonaddedtohexdb = ':'.join(macaddress[i:i + 4] for i in range(0, len(macaddress), 4)) #Adding colons to the IPV6 address
-              ipv6Parts = colonaddedtohexdb.split(":") #Splitting for future ease
-              macParts = [] #Parts, to be used in the futre
-              for ipv6Part in ipv6Parts[-4:]: #Looping, so we can build the ipv6 address
-                  while len(ipv6Part) < 4:
-                      ipv6Part = "0" + ipv6Part
-                  macParts.append(ipv6Part[:2])
-                  macParts.append(ipv6Part[-2:])
-              # modify parts to match MAC value
-              macParts[0] = "%02x" % (int(macParts[0], 16) ^ 2) #Formatting
-              del macParts[4] #Nope
-              del macParts[3] #Nope again
-              rawmacparts = ":".join(macParts) #More formatting
-              finalmac=str(rawmacparts).upper() #Upper case  
-              sys.stdout.write(str(macaddress).upper()+"||"+str(colonaddedtohexdb)+" IPv6 MAC: "+str(finalmac)+"||") #Writing raw address and converted address to stdout
-          elif ( (str(macaddress) == "00000000000000000000000000000001") and (Column_Name == "Address") and (len(hexdb) == 32)): # A couple of checks for the IPV6 local host address formatting
-              sys.stdout.write(str(macaddress).upper()+"||Local Host ::1||") #Writing the data out if the address is local host IPv6
-          else:
-              sys.stdout.write(str(macaddress).upper()+"||Unable to convert data||") #Writing data out if the loop doesn't work. Including the statement, just to make sure
+        if (Table_Record.get_value_data(Column_Number) == None):
+            sys.stdout.write("NO BINARY_DATA_TO_HEX||NO BINARY_DATA_TO_HEX||") #Writing data out if the loop doesn't work. Including the statement, just to make sure
+
+            series_list.append("NO BINARY_DATA_TO_HEX") # TT
+            series_list.append("NO BINARY_DATA_TO_HEX") # TT
+
+        else:
+            hexdb=binascii.hexlify(Table_Record.get_value_data(Column_Number)) #Turning the binary data to hex
+            macaddress=hexdb.decode('utf-8', 'ignore') 
+            if ((len(hexdb) <= 8) and Column_Name == "Address"): #Checking to see what the hex length is, and doing the needed conversion to IP addresses here 
+                if (len(hexdb)< 8):  #A check to help ensure length is right
+                    hexdb = ''.join(('0',hexdb)) #Adding zeros to make sure everything is correct
+                ipaddr = "%i.%i.%i.%i" % (int(hexdb[0:2],16),int(hexdb[2:4],16),int(hexdb[4:6],16),int(hexdb[6:8],16)) #Proper formatting
+                raw_ipaddr_correlations = DNS_Dict.get(ipaddr, "No Match for IP address found") #Looking up value-key in DNS_Dict dictionary file above
+                ipaddr_correlations = str(raw_ipaddr_correlations).strip("[]") #Removing brackets
+                sys.stdout.write(str(macaddress).upper()+"||"+str(ipaddr)+" ("+str(ipaddr_correlations)+")||") #Writing raw address and converted address to stdout
+
+                series_list.append(str(str(macaddress).upper())) # TT
+                series_list.append(str(ipaddr) + " (" + str(ipaddr_correlations)+ ")") # TT
+
+
+            elif (((macaddress[:4] == "fe80") or (macaddress[:4] == "2001")) and (Column_Name == "Address") and (len(hexdb) == 32)): # A couple of checks for the IPV6 address formatting. So far have only seen fe80 and 2001, there may be more
+                colonaddedtohexdb = ':'.join(macaddress[i:i + 4] for i in range(0, len(macaddress), 4)) #Adding colons to the IPV6 address
+                ipv6Parts = colonaddedtohexdb.split(":") #Splitting for future ease
+                macParts = [] #Parts, to be used in the futre
+                for ipv6Part in ipv6Parts[-4:]: #Looping, so we can build the ipv6 address
+                    while len(ipv6Part) < 4:
+                        ipv6Part = "0" + ipv6Part
+                    macParts.append(ipv6Part[:2])
+                    macParts.append(ipv6Part[-2:])
+                # modify parts to match MAC value
+                macParts[0] = "%02x" % (int(macParts[0], 16) ^ 2) #Formatting
+                del macParts[4] #Nope
+                del macParts[3] #Nope again
+                rawmacparts = ":".join(macParts) #More formatting
+                finalmac=str(rawmacparts).upper() #Upper case  
+                sys.stdout.write(str(macaddress).upper()+"||"+str(colonaddedtohexdb)+" IPv6 MAC: "+str(finalmac)+"||") #Writing raw address and converted address to stdout
+
+                series_list.append(str(str(macaddress).upper())) # TT
+                series_list.append(str(colonaddedtohexdb) + "IPv6 MAC: " +str(finalmac)) # TT
+
+
+            elif ( (str(macaddress) == "00000000000000000000000000000001") and (Column_Name == "Address") and (len(hexdb) == 32)): # A couple of checks for the IPV6 local host address formatting
+                sys.stdout.write(str(macaddress).upper()+"||Local Host ::1||") #Writing the data out if the address is local host IPv6
+
+                series_list.append(str(str(macaddress).upper())) # TT
+                series_list.append("Local Host ::1||") # TT
+
+            else:
+                sys.stdout.write(str(macaddress).upper()+"||Unable to convert data||") #Writing data out if the loop doesn't work. Including the statement, just to make sure
+
+                series_list.append(str(str(macaddress).upper())) # TT
+                series_list.append("Unable to convert data") # TT
+
     elif (Column_Type == 10): #TEXT	
-       if (Table_Record.get_value_data(Column_Number) == None):
-          return Record_List.append('')
-       else:
-          return Record_List.append(Table_Record.get_value_data(Column_Number).decode('utf-16', 'ignore'))
+        if (Table_Record.get_value_data(Column_Number) == None):
+            return Record_List.append('')
+        else:
+            return Record_List.append(Table_Record.get_value_data(Column_Number).decode('utf-16', 'ignore'))
+
     elif (Column_Type == 11): #LARGE_BINARY_DATA
-       if (Table_Record.get_value_data(Column_Number) == None):
-          return Record_List.append('')
-       else:
-          return Record_List.append(Table_Record.get_value_data(Column_Number))
+        if (Table_Record.get_value_data(Column_Number) == None):
+            return Record_List.append('')
+        else:
+            return Record_List.append(Table_Record.get_value_data(Column_Number))
     elif (Column_Type == 12): #LARGE_TEXT	
-       if ((Table_Record.get_value_data(Column_Number) == None) and (Column_Name == "ClientName")):
+        if ((Table_Record.get_value_data(Column_Number) == None) and (Column_Name == "ClientName")):
           return Record_List.append('') #Returning Nothing for ClientName
-       elif ((Table_Record.get_value_data(Column_Number) == None) and (Column_Name == "AuthenticatedUserName")):
+        elif ((Table_Record.get_value_data(Column_Number) == None) and (Column_Name == "AuthenticatedUserName")):
           sys.stdout.write("<BLANK>||") #Printing the large text data
-       elif ((Table_Record.get_value_data(Column_Number) == "\x00\x00") and (Column_Name == "AuthenticatedUserName")):
+
+          series_list.append("<BLANK>") # TT
+
+        elif ((Table_Record.get_value_data(Column_Number) == "\x00\x00") and (Column_Name == "AuthenticatedUserName")):
           sys.stdout.write("<BLANK>||") #Printing the large text data
-       elif ((Table_Record.get_value_data(Column_Number) == "") and (Column_Name == "AuthenticatedUserName")):
+
+          series_list.append("<BLANK>") # TT
+
+        elif ((Table_Record.get_value_data(Column_Number) == "") and (Column_Name == "AuthenticatedUserName")):
           sys.stdout.write("<BLANK>||") #Printing the large text data
-       elif ((Column_Name == "Address") and (Table_name == "DNS" )): #Pulling out IP address from DNS table
+
+          series_list.append("<BLANK>") # TT
+
+        elif ((Column_Name == "Address") and (Table_name == "DNS" )): #Pulling out IP address from DNS table
           global ip_address_from_dns #Declaring the global variable
           ip_address_from_dns = Table_Record.get_value_data(Column_Number).decode('utf-16', 'ignore').replace('\x00', '') #Assigning the IP address to the variable
-       elif ((Column_Name == "HostName") and (Table_name == "DNS" )): #Pulling out Hostname from DNS table
+        elif ((Column_Name == "HostName") and (Table_name == "DNS" )): #Pulling out Hostname from DNS table
           hostname_from_dns = Table_Record.get_value_data(Column_Number).decode('utf-16', 'ignore').replace('\x00', '') #Assigning the Hostname to the variable
           #sys.stdout.write("DNS IP Address is "+ip_address_from_dns+" hostname is "+str(hostname_from_dns)+"\r\n")
           if ip_address_from_dns in DNS_Dict: #Populating DNS_Dict dictionary varaiable
               DNS_Dict[str(ip_address_from_dns)].append(str(hostname_from_dns)) #Append if value is seen
           else:
               DNS_Dict[str(ip_address_from_dns)] = [str(hostname_from_dns)] #Create new pair if value is not seen
-       else:
+        else:
           large_text = Table_Record.get_value_data(Column_Number).decode('utf-16', 'ignore')
           lengthoflarge_text=len(large_text) #Computing the length, as another check
           if ((lengthoflarge_text > 1) and (pythonversion == 2) ):
-            sys.stdout.write(large_text.encode('utf-8')+"||") #Printing the large text data if value is greater than 1
+            sys.stdout.write(large_text.encode('utf-8')+"||".rstrip()) #Printing the large text data if value is greater than 1
+
+            series_list.append(large_text.encode('utf-8')) # TT
+
           elif ((lengthoflarge_text > 1) and (pythonversion > 2) ):
             sys.stdout.write(large_text+"||") #Printing the large text data if value is greater than 1
+
+            series_list.append(large_text) # TT
+
           else:
             sys.stdout.write("<BLANK>||") #Printing the large text data if value is not greater than 1
+
+            series_list.append("<BLANK>") # TT
+
+
     elif (Column_Type == 13): #SUPER_LARGE_VALUE
        return Record_List.append(Table_Record.get_value_data_as_integer(Column_Number))	
     elif (Column_Type == 14): #INTEGER_32BIT_UNSIGNED	
@@ -227,13 +286,24 @@ def Check_Column_Type(Table_Record, Column_Type, Column_Number, Record_List): #A
            global totalcountofaccesses #Calling the global variable
            totalcountofaccesses=int32bitunsigned #Setting the global variable for a check later on
            sys.stdout.write(int32bitunsigned+"||") #Printing the number of Accesses
+           
+           series_list.append(int32bitunsigned) # TT
+
+
        else:
            sys.stdout.write(int32bitunsigned+"||") #Printing the number
+
+           series_list.append(int32bitunsigned) # TT
+
+
     elif (Column_Type == 15): #INTEGER_64BIT_SIGNED
        return Record_List.append(Table_Record.get_value_data_as_integer(Column_Number))	
     elif (Column_Type == 16): #GUID	
        if (Table_Record.get_value_data(Column_Number) == None):
            sys.stdout.write("NO GUID DATA||") #Printing the string
+
+           series_list.append("NO GUID DATA") # TT
+
        else:
           uuid_Bytes = Table_Record.get_value_data(Column_Number)
           orgguid = uuid.UUID(bytes_le=uuid_Bytes) #Turning the data into a GUID
@@ -243,12 +313,18 @@ def Check_Column_Type(Table_Record, Column_Type, Column_Number, Record_List): #A
           fullguid='{'+ucrawguid+'}' #Building the GUID for the table lookup
           if (Column_Name == "RoleGuid"): #Ensuring Column Name is correct
               GUID_conversion = GUID_Dict.get(fullguid, "No Match for GUID found") #Looking up value-key in GUID_Dict dictionary file above
-              sys.stdout.write(fullguid+" ("+GUID_conversion+")||") #Writing the string           
+              sys.stdout.write(fullguid+" ("+GUID_conversion+")||") #Writing the string
+
+              series_list.append(fullguid+" ("+GUID_conversion+")") # TT
+                         
           else:
               sys.stdout.write(fullguid+"||") #If it doesn't work, writing the string
+
+              series_list.append(fullguid) # TT
+              
     elif (Column_Type == 17): #INTEGER_16BIT_UNSIGNED
-       value=Table_Record.get_value_data_as_integer(Column_Number)
-       if ( (value > 0) and ( "Day" in str(Column_Name)) ): #Checking to see if Day is in the field. If so, we will do some converting
+        value=Table_Record.get_value_data_as_integer(Column_Number)
+        if ( (value > 0) and ( "Day" in str(Column_Name)) ): #Checking to see if Day is in the field. If so, we will do some converting
            juliandate= str(Column_Name)[3:] #Pulling out Julian Date
            #sys.stdout.write(str(juliandate)+" is Julian Date\r\n")
            global insertdatefourofyear #Pulling the insert date four of year
@@ -260,6 +336,9 @@ def Check_Column_Type(Table_Record, Column_Type, Column_Number, Record_List): #A
            if ( (int(insertdatefourofyear)) != (int(lastaccessfourofyear)) and (Column_Name != "Day1") and (totalcountofaccesses == "2") ) : #We enter this loop if the years don't match, the day isn't Day1, and the count of accesses is two (because we can deduce what is what)
                if (correlatedtwoaccessmismatchyear != "Yes"): #A nested loop, because we need to do this
                    sys.stdout.write(str(insertdateyyyymmdd)+":1, "+str(lastaccessyyyymmdd)+":1") #Writing the string here
+
+                   dates_and_accesses.append((str(insertdateyyyymmdd)+":1, "+str(lastaccessyyyymmdd)+":1")) # TT
+
                    correlatedtwoaccessmismatchyear="Yes" #Setting the variable to yes
            else:
                if ( (int(insertdatefourofyear)) != (int(lastaccessfourofyear)) and (Column_Name != "Day1") and (totalcountofaccesses > "2") and (badyeardetector != "Yes") ) : #We enter this loop if the years don't match, the day isn't Day1, and the count of accesses is greater than two. Because who knows what is going on with this database here?
@@ -273,10 +352,14 @@ def Check_Column_Type(Table_Record, Column_Type, Column_Number, Record_List): #A
                testingd = datetime.datetime.strptime('{} {}'.format(juliandate, insertdatefourofyear),'%j %Y') #Formatting the day to datetime
                fullconvjd = testingd.strftime("%Y-%m-%d") #Another formatting
                sys.stdout.write(str(fullconvjd)+": "+str(value)+", ") #Printing the string
-       elif ( value > 0):
-           sys.stdout.write(str(Column_Name)+" "+str(value)+",") #Printing the string
-       else:
-           sys.stdout.write("") #Printing the string
+
+               dates_and_accesses.append(str(fullconvjd)+": "+str(value)+", ") # TT
+
+
+        elif ( value > 0):
+            sys.stdout.write(str(Column_Name)+" "+str(value)+",") #Printing the string
+        else:
+            sys.stdout.write("") #Printing the string
 
 
 if len(sys.argv) == 1:
@@ -284,7 +367,9 @@ if len(sys.argv) == 1:
     sys.stderr.write("Version "+str(kstrikeversionnumber)+"\r\n") #Writing version to STDERR
     sys.stderr.write("\r\nThis script will parse on-disk User Access Logging found on Windows Server 2012\r\nand later systems under the path \"\Windows\System32\LogFiles\SUM\"\r\nThe output is double pipe || delimited\r\n\r\n\r\nExample Usage: KStrike.py Current.mdb > SYSNAME_Current.txt\r\n\r\n") #Writing info to SDTERR
     sys.exit() #A nice clean exit
-#First, we figure the version of python we are runningif sys.version_info[0] < 3:    pythonversion=2
+#First, we figure the version of python we are running
+if sys.version_info[0] < 3:
+    pythonversion=2
 else:
     pythonversion=3
 sys.stderr.write("\r\nPython Version" +str(pythonversion)+" detected\r\n\r\n") #Writing info to SDTERR
@@ -342,12 +427,30 @@ if (Table_Num_Records > 0 and Table_name == "CLIENTS"): #Another check to ensure
          Column_Type = Table_Record.get_column_type(x) #Getting type
          Check_Column_Type(Table_Record, Column_Type, x, Data_Value) #Arguments to pass to subroutine
        sys.stdout.write("||\r\n") #Last bit of formatting to string
+
+       dates_and_access_str = ''.join(dates_and_accesses).strip(', ')  # TT
+       series_list.append(dates_and_access_str) # TT
+       record = pd.Series(series_list, index=header) # TT
+       df = df.append(record, ignore_index=True) # TT
+       dates_and_access_str = list() # TT
+       series_list = list() # TT
+
        badyeardetector="No" #Changing it back to No
        correlatedtwoaccessmismatchyear="No" #Changing it back to No
 else:
     sys.stderr.write("The table \"CLIENTS\" has zero records\r\n")
     progresscounter="0"
 esedb_file.close() #Close db
+
+
+max_rows, max_columns = df.shape
+print('Number of Rows {}'.format(str(max_rows)))
+if max_rows > 0:
+    df = df.fillna("")
+    # header = ['Role', 'TenantId', 'TotalAccesses', 'InsertDate', 'LastAccess', 'RawAddress', 'Address_HostName', 'AuthenticatedUserName', 'DatesAndAccesses']
+    test_file = r'C:\cases\Test\sum.csv'
+    df.to_csv(test_file)
+
 
 scriptruntime=(time.time() - StartTime) #Calculating the run time
 formattedscriptruntime=int(scriptruntime) #Making an integer for the result
