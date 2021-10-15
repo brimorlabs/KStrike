@@ -1,3 +1,6 @@
+# Work In Progress
+Not ready for use
+
 ![KStrike](https://github.com/brimorlabs/KStrike/blob/master/logo.png?raw=true)
 
 
