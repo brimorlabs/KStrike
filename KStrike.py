@@ -80,7 +80,8 @@ totalcountofaccesses = [] # We will use this later
 badyeardetector = [] # We will use this later as a check
 correlatedtwoaccessmismatchyear = "No" # We will use this later as a check
 
-header = ['Role', 'TenantId', 'TotalAccesses', 'InsertDate', 'LastAccess', 'RawAddress', 'Address_HostName', 'AuthenticatedUserName', 'DatesAndAccesses']
+header = ['RoleGuid', 'RoleName', 'TenantId', 'TotalAccesses', 'InsertDate', 'LastAccess', 'RawAddress', 'ConvertedAddress', 'Correlated_HostName', 'AuthenticatedUserName', 'DatesAndAccesses']
+
 df = pd.DataFrame(data=None, index=None, columns=header, dtype=None, copy=None) 
 series_list = list()
 dates_and_accesses = list()
@@ -178,7 +179,8 @@ def Check_Column_Type(Table_Record, Column_Type, Column_Number, Record_List): #A
                 sys.stdout.write(str(macaddress).upper()+"||"+str(ipaddr)+" ("+str(ipaddr_correlations)+")||") #Writing raw address and converted address to stdout
 
                 series_list.append(str(str(macaddress).upper())) 
-                series_list.append(str(ipaddr) + " (" + str(ipaddr_correlations)+ ")") 
+                series_list.append(str(ipaddr))
+                series_list.append(str(ipaddr_correlations))
 
 
             elif (((macaddress[:4] == "fe80") or (macaddress[:4] == "2001")) and (Column_Name == "Address") and (len(hexdb) == 32)): # A couple of checks for the IPV6 address formatting. So far have only seen fe80 and 2001, there may be more
@@ -308,7 +310,8 @@ def Check_Column_Type(Table_Record, Column_Type, Column_Number, Record_List): #A
               GUID_conversion = GUID_Dict.get(fullguid, "No Match for GUID found") #Looking up value-key in GUID_Dict dictionary file above
               sys.stdout.write(fullguid+" ("+GUID_conversion+")||") #Writing the string
 
-              series_list.append(fullguid+" ("+GUID_conversion+")") 
+              series_list.append(fullguid)
+              series_list.append(GUID_conversion)
                          
           else:
               sys.stdout.write(fullguid+"||") #If it doesn't work, writing the string
@@ -389,7 +392,7 @@ def write_xlsx(df, xls_file):
 
     max_rows, max_col = df.shape
     if max_rows > 0:
-        header = ['Role', 'TenantId', 'TotalAccesses', 'InsertDate', 'LastAccess', 'RawAddress', 'Address_HostName', 'AuthenticatedUserName', 'DatesAndAccesses']
+        #header = ['Role', 'TenantId', 'TotalAccesses', 'InsertDate', 'LastAccess', 'RawAddress', 'Address_HostName', 'AuthenticatedUserName', 'DatesAndAccesses']
         with pd.ExcelWriter(xls_file, date_format='YYYY-MM-DD HH:MM:SS') as writer:
             df.to_excel(writer, sheet_name='Sheet1', startrow=0, header=True, index=False)
             workbook  = writer.book
@@ -408,14 +411,14 @@ def write_xlsx(df, xls_file):
                 'valign': 'top'
             })
 
-            worksheet.set_column('A:A', 95, body_format)
-            worksheet.set_column('B:B', 40, body_format)
-            worksheet.set_column('C:C', 15, body_format)           
-            worksheet.set_column('D:E', 25, body_format)
-            worksheet.set_column('F:F', 15, body_format)
-            worksheet.set_column('G:G', 45, body_format)
-            worksheet.set_column('H:H', 30, body_format)
-            worksheet.set_column('I:I', 60, body_format)
+            worksheet.set_column('A:A', 42, body_format)
+            worksheet.set_column('B:B', 55, body_format)
+            worksheet.set_column('C:C', 40, body_format)           
+            worksheet.set_column('D:D', 15, body_format)
+            worksheet.set_column('E:F', 25, body_format)
+            worksheet.set_column('G:G', 15, body_format)
+            worksheet.set_column('H:J', 30, body_format)
+            worksheet.set_column('K:K', 60, body_format)
             worksheet.write_row(0, 0, header, header_format)
             worksheet.autofilter(0, 0, max_rows, max_col)
             worksheet.freeze_panes(1, 0)
@@ -430,10 +433,10 @@ if len(sys.argv) == 1:
     sys.stderr.write("The output type is based on the file extension with invalid extensions writing to a csv file.\r\n\r\n")
     sys.stderr.write("Example Usage: \r\n")
     sys.stderr.write("KStrike.py Current.mdb > SYSNAME_Current.txt\r\n") #Writing info to SDTERR
-    sys.stderr.write("KStrike.py C\Windows\System32\LogFiles\SUM\Current.mdb C:\cases\Test\sum.csv \r\n")
-    sys.stderr.write("KStrike.py C\Windows\System32\LogFiles\SUM\Current.mdb C:\cases\Test\sum.json \r\n")
-    sys.stderr.write("KStrike.py C\Windows\System32\LogFiles\SUM\Current.mdb C:\cases\Test\sum.xlsx \r\n")
-    sys.stderr.write("KStrike.py C\Windows\System32\LogFiles\SUM\Current.mdb C:\cases\Test\sum.txt \r\n")
+    sys.stderr.write("KStrike.py C\Windows\System32\LogFiles\SUM\Current.mdb SYSNAME_Current.csv \r\n")
+    sys.stderr.write("KStrike.py C\Windows\System32\LogFiles\SUM\Current.mdb SYSNAME_Current.json \r\n")
+    sys.stderr.write("KStrike.py C\Windows\System32\LogFiles\SUM\Current.mdb SYSNAME_Current.xlsx \r\n")
+    sys.stderr.write("KStrike.py C\Windows\System32\LogFiles\SUM\Current.mdb SYSNAME_Current.txt \r\n")
     sys.exit() #A nice clean exit
 #First, we figure the version of python we are running
 if sys.version_info[0] < 3:
