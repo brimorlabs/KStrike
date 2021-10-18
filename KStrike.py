@@ -4,7 +4,7 @@
 Initially Developed January 30, 2021
 
 Added by Tim Taylor
-2021-##-## - Added optional file output, vs using a redirect
+2021-10-18 - Added optional file output for csv, json and xlsx vs using a redirect
 
 Updates
 2021-06-24 - Added Python3 support
@@ -47,11 +47,8 @@ Many thanks to:
 - Mark McKinnon and Mark Baggett (for their work on SRUM parsing scripts which helped with ESE database/field structure
 - Microsoft reference material on this artifact: https://docs.microsoft.com/en-us/windows-server/administration/user-access-logging/manage-user-access-logging
 '''
-# Added by TT
+import errno
 import pandas as pd
-from tabulate import tabulate
-
-# Original imports
 import pyesedb
 import sys
 import os
@@ -69,7 +66,7 @@ from struct import unpack
 import time
 
 # Declared variables
-kstrikeversionnumber = "20210624" # KStrike Version number
+kstrikeversionnumber = "2021018-TT" # KStrike Version number
 StartTime=time.time() # Recording the start time
 insertdatefourofyear = [] # We will use this later
 insertdateyyyymmdd = [] # We will use this later
@@ -83,14 +80,11 @@ totalcountofaccesses = [] # We will use this later
 badyeardetector = [] # We will use this later as a check
 correlatedtwoaccessmismatchyear = "No" # We will use this later as a check
 
-# Added by TT
-
 header = ['Role', 'TenantId', 'TotalAccesses', 'InsertDate', 'LastAccess', 'RawAddress', 'Address_HostName', 'AuthenticatedUserName', 'DatesAndAccesses']
 df = pd.DataFrame(data=None, index=None, columns=header, dtype=None, copy=None) 
 series_list = list()
 dates_and_accesses = list()
 ip_address_from_dns = ''
-
 
 # Setup dictionary for column types
 Column_Dict = {0:'NULL', 1:'Text', 2:'Integer', 3:'Integer', 4:'Integer', 5:'Integer', 6:'Real', 7:'Real', 8:'Text', 9:'Blob', \
@@ -115,7 +109,7 @@ def win_date_bin_to_datetime(win_date_bin): #This converts the datetime field of
         windowsdt = "UNRECOGNIZED TIMESTAMP"
     sys.stdout.write(str(windowsdt)+"||")
 
-    series_list.append(str(windowsdt)) # TT 
+    series_list.append(str(windowsdt))  
 
     fourofyear=str(windowsdt)[0:4] #Pulling the four of the year
     fullyyyymmdd=str(windowsdt)[0:10] # Pulling the full yyyy-mm-dd
@@ -169,8 +163,8 @@ def Check_Column_Type(Table_Record, Column_Type, Column_Number, Record_List): #A
         if (Table_Record.get_value_data(Column_Number) == None):
             sys.stdout.write("NO BINARY_DATA_TO_HEX||NO BINARY_DATA_TO_HEX||") #Writing data out if the loop doesn't work. Including the statement, just to make sure
 
-            series_list.append("NO BINARY_DATA_TO_HEX") # TT
-            series_list.append("NO BINARY_DATA_TO_HEX") # TT
+            series_list.append("NO BINARY_DATA_TO_HEX") 
+            series_list.append("NO BINARY_DATA_TO_HEX") 
 
         else:
             hexdb=binascii.hexlify(Table_Record.get_value_data(Column_Number)) #Turning the binary data to hex
@@ -183,8 +177,8 @@ def Check_Column_Type(Table_Record, Column_Type, Column_Number, Record_List): #A
                 ipaddr_correlations = str(raw_ipaddr_correlations).strip("[]") #Removing brackets
                 sys.stdout.write(str(macaddress).upper()+"||"+str(ipaddr)+" ("+str(ipaddr_correlations)+")||") #Writing raw address and converted address to stdout
 
-                series_list.append(str(str(macaddress).upper())) # TT
-                series_list.append(str(ipaddr) + " (" + str(ipaddr_correlations)+ ")") # TT
+                series_list.append(str(str(macaddress).upper())) 
+                series_list.append(str(ipaddr) + " (" + str(ipaddr_correlations)+ ")") 
 
 
             elif (((macaddress[:4] == "fe80") or (macaddress[:4] == "2001")) and (Column_Name == "Address") and (len(hexdb) == 32)): # A couple of checks for the IPV6 address formatting. So far have only seen fe80 and 2001, there may be more
@@ -204,21 +198,21 @@ def Check_Column_Type(Table_Record, Column_Type, Column_Number, Record_List): #A
                 finalmac=str(rawmacparts).upper() #Upper case  
                 sys.stdout.write(str(macaddress).upper()+"||"+str(colonaddedtohexdb)+" IPv6 MAC: "+str(finalmac)+"||") #Writing raw address and converted address to stdout
 
-                series_list.append(str(str(macaddress).upper())) # TT
-                series_list.append(str(colonaddedtohexdb) + "IPv6 MAC: " +str(finalmac)) # TT
+                series_list.append(str(str(macaddress).upper())) 
+                series_list.append(str(colonaddedtohexdb) + "IPv6 MAC: " +str(finalmac)) 
 
 
             elif ( (str(macaddress) == "00000000000000000000000000000001") and (Column_Name == "Address") and (len(hexdb) == 32)): # A couple of checks for the IPV6 local host address formatting
                 sys.stdout.write(str(macaddress).upper()+"||Local Host ::1||") #Writing the data out if the address is local host IPv6
 
-                series_list.append(str(str(macaddress).upper())) # TT
-                series_list.append("Local Host ::1||") # TT
+                series_list.append(str(str(macaddress).upper())) 
+                series_list.append("Local Host ::1||") 
 
             else:
                 sys.stdout.write(str(macaddress).upper()+"||Unable to convert data||") #Writing data out if the loop doesn't work. Including the statement, just to make sure
 
-                series_list.append(str(str(macaddress).upper())) # TT
-                series_list.append("Unable to convert data") # TT
+                series_list.append(str(str(macaddress).upper())) 
+                series_list.append("Unable to convert data") 
 
     elif (Column_Type == 10): #TEXT	
         if (Table_Record.get_value_data(Column_Number) == None):
@@ -237,17 +231,17 @@ def Check_Column_Type(Table_Record, Column_Type, Column_Number, Record_List): #A
         elif ((Table_Record.get_value_data(Column_Number) == None) and (Column_Name == "AuthenticatedUserName")):
           sys.stdout.write("<BLANK>||") #Printing the large text data
 
-          series_list.append("<BLANK>") # TT
+          series_list.append("<BLANK>") 
 
         elif ((Table_Record.get_value_data(Column_Number) == "\x00\x00") and (Column_Name == "AuthenticatedUserName")):
           sys.stdout.write("<BLANK>||") #Printing the large text data
 
-          series_list.append("<BLANK>") # TT
+          series_list.append("<BLANK>") 
 
         elif ((Table_Record.get_value_data(Column_Number) == "") and (Column_Name == "AuthenticatedUserName")):
           sys.stdout.write("<BLANK>||") #Printing the large text data
 
-          series_list.append("<BLANK>") # TT
+          series_list.append("<BLANK>") 
 
         elif ((Column_Name == "Address") and (Table_name == "DNS" )): #Pulling out IP address from DNS table
           global ip_address_from_dns #Declaring the global variable
@@ -263,19 +257,19 @@ def Check_Column_Type(Table_Record, Column_Type, Column_Number, Record_List): #A
           large_text = Table_Record.get_value_data(Column_Number).decode('utf-16', 'ignore')
           lengthoflarge_text=len(large_text) #Computing the length, as another check
           if ((lengthoflarge_text > 1) and (pythonversion == 2) ):
-            sys.stdout.write(large_text.encode('utf-8')+"||".rstrip()) #Printing the large text data if value is greater than 1
+            sys.stdout.write(large_text.encode('utf-8')+"||") #Printing the large text data if value is greater than 1
 
-            series_list.append(large_text.encode('utf-8')) # TT
+            series_list.append(large_text.encode('utf-8')) 
 
           elif ((lengthoflarge_text > 1) and (pythonversion > 2) ):
             sys.stdout.write(large_text+"||") #Printing the large text data if value is greater than 1
 
-            series_list.append(large_text) # TT
+            series_list.append(large_text) 
 
           else:
             sys.stdout.write("<BLANK>||") #Printing the large text data if value is not greater than 1
 
-            series_list.append("<BLANK>") # TT
+            series_list.append("<BLANK>") 
 
 
     elif (Column_Type == 13): #SUPER_LARGE_VALUE
@@ -287,13 +281,12 @@ def Check_Column_Type(Table_Record, Column_Type, Column_Number, Record_List): #A
            totalcountofaccesses=int32bitunsigned #Setting the global variable for a check later on
            sys.stdout.write(int32bitunsigned+"||") #Printing the number of Accesses
            
-           series_list.append(int32bitunsigned) # TT
-
+           series_list.append(int32bitunsigned) 
 
        else:
            sys.stdout.write(int32bitunsigned+"||") #Printing the number
 
-           series_list.append(int32bitunsigned) # TT
+           series_list.append(int32bitunsigned) 
 
 
     elif (Column_Type == 15): #INTEGER_64BIT_SIGNED
@@ -302,7 +295,7 @@ def Check_Column_Type(Table_Record, Column_Type, Column_Number, Record_List): #A
        if (Table_Record.get_value_data(Column_Number) == None):
            sys.stdout.write("NO GUID DATA||") #Printing the string
 
-           series_list.append("NO GUID DATA") # TT
+           series_list.append("NO GUID DATA") 
 
        else:
           uuid_Bytes = Table_Record.get_value_data(Column_Number)
@@ -315,12 +308,12 @@ def Check_Column_Type(Table_Record, Column_Type, Column_Number, Record_List): #A
               GUID_conversion = GUID_Dict.get(fullguid, "No Match for GUID found") #Looking up value-key in GUID_Dict dictionary file above
               sys.stdout.write(fullguid+" ("+GUID_conversion+")||") #Writing the string
 
-              series_list.append(fullguid+" ("+GUID_conversion+")") # TT
+              series_list.append(fullguid+" ("+GUID_conversion+")") 
                          
           else:
               sys.stdout.write(fullguid+"||") #If it doesn't work, writing the string
 
-              series_list.append(fullguid) # TT
+              series_list.append(fullguid) 
               
     elif (Column_Type == 17): #INTEGER_16BIT_UNSIGNED
         value=Table_Record.get_value_data_as_integer(Column_Number)
@@ -337,7 +330,7 @@ def Check_Column_Type(Table_Record, Column_Type, Column_Number, Record_List): #A
                if (correlatedtwoaccessmismatchyear != "Yes"): #A nested loop, because we need to do this
                    sys.stdout.write(str(insertdateyyyymmdd)+":1, "+str(lastaccessyyyymmdd)+":1") #Writing the string here
 
-                   dates_and_accesses.append((str(insertdateyyyymmdd)+":1, "+str(lastaccessyyyymmdd)+":1")) # TT
+                   dates_and_accesses.append((str(insertdateyyyymmdd)+":1, "+str(lastaccessyyyymmdd)+":1")) 
 
                    correlatedtwoaccessmismatchyear="Yes" #Setting the variable to yes
            else:
@@ -353,7 +346,7 @@ def Check_Column_Type(Table_Record, Column_Type, Column_Number, Record_List): #A
                fullconvjd = testingd.strftime("%Y-%m-%d") #Another formatting
                sys.stdout.write(str(fullconvjd)+": "+str(value)+", ") #Printing the string
 
-               dates_and_accesses.append(str(fullconvjd)+": "+str(value)+", ") # TT
+               dates_and_accesses.append(str(fullconvjd)+": "+str(value)+", ") 
 
 
         elif ( value > 0):
@@ -362,10 +355,85 @@ def Check_Column_Type(Table_Record, Column_Type, Column_Number, Record_List): #A
             sys.stdout.write("") #Printing the string
 
 
+def create_directory(path):
+    if not os.path.exists(path):
+        try:
+            os.makedirs(path)
+        except OSError as error:
+            if error.errno != errno.EEXIST:
+                raise
+
+
+def write_csv(df, csv_file):
+    path_to_write = os.path.dirname(csv_file)
+    create_directory(path_to_write)
+
+    max_rows, max_columns = df.shape
+    if max_rows > 0:
+        # header = ['Role', 'TenantId', 'TotalAccesses', 'InsertDate', 'LastAccess', 'RawAddress', 'Address_HostName', 'AuthenticatedUserName', 'DatesAndAccesses']
+        df.to_csv(csv_file, header=True, index=False, na_rep='')
+
+
+def write_json(df, json_file):
+    path_to_write = os.path.dirname(json_file)
+    create_directory(path_to_write)
+
+    max_rows, max_columns = df.shape
+    if max_rows > 0:
+        df.to_json(json_file, orient='records', date_format='iso', lines=True,index=True)
+
+
+def write_xlsx(df, xls_file):
+    path_to_write = os.path.dirname(xls_file)
+    create_directory(path_to_write)
+
+    max_rows, max_col = df.shape
+    if max_rows > 0:
+        header = ['Role', 'TenantId', 'TotalAccesses', 'InsertDate', 'LastAccess', 'RawAddress', 'Address_HostName', 'AuthenticatedUserName', 'DatesAndAccesses']
+        with pd.ExcelWriter(xls_file, date_format='YYYY-MM-DD HH:MM:SS') as writer:
+            df.to_excel(writer, sheet_name='Sheet1', startrow=0, header=True, index=False)
+            workbook  = writer.book
+            worksheet = writer.sheets['Sheet1']
+            
+            header_format = workbook.add_format({
+                'bold': True,
+                'text_wrap': True,
+                'valign': 'top',
+                'fg_color': '#0070C0',
+                'border': 1})
+            
+            body_format = workbook.add_format({
+                'text_wrap': True,
+                'align': 'left',
+                'valign': 'top'
+            })
+
+            worksheet.set_column('A:A', 95, body_format)
+            worksheet.set_column('B:B', 40, body_format)
+            worksheet.set_column('C:C', 15, body_format)           
+            worksheet.set_column('D:E', 25, body_format)
+            worksheet.set_column('F:F', 15, body_format)
+            worksheet.set_column('G:G', 45, body_format)
+            worksheet.set_column('H:H', 30, body_format)
+            worksheet.set_column('I:I', 60, body_format)
+            worksheet.write_row(0, 0, header, header_format)
+            worksheet.autofilter(0, 0, max_rows, max_col)
+            worksheet.freeze_panes(1, 0)
+
+
 if len(sys.argv) == 1:
     sys.stderr.write("\r\n88      a8P   ad88888ba                      88  88\r\n88    ,88'   d8\"     \"8b  ,d                 \"\"  88\r\n88  ,88\"     Y8,          88                     88\r\n88,d88'      `Y8aaaaa,  MM88MMM  8b,dPPYba,  88  88   ,d8   ,adPPYba,\r\n8888\"88,       `\"\"\"\"\"8b,  88     88P'   \"Y8  88  88 ,a8\"   a8P_____88\r\n88P   Y8b            `8b  88     88          88  8888[     8PP\"\"\"\"\"\"\"\r\n88     \"88,  Y8a     a8P  88,    88          88  88`\"Yba,  \"8b,   ,aa\r\n88       Y8b  \"Y88888P\"   \"Y888  88          88  88   `Y8a  `\"Ybbd8\"'\r\n\r\n") #Writing ASCII art to STDERr
     sys.stderr.write("Version "+str(kstrikeversionnumber)+"\r\n") #Writing version to STDERR
-    sys.stderr.write("\r\nThis script will parse on-disk User Access Logging found on Windows Server 2012\r\nand later systems under the path \"\Windows\System32\LogFiles\SUM\"\r\nThe output is double pipe || delimited\r\n\r\n\r\nExample Usage: KStrike.py Current.mdb > SYSNAME_Current.txt\r\n\r\n") #Writing info to SDTERR
+    sys.stderr.write("\r\nThis script will parse on-disk User Access Logging found on Windows Server 2012\r\nand later systems under the path \"\Windows\System32\LogFiles\SUM\"\r\n")
+    sys.stderr.write("The output is double pipe || delimited when re-directed to a file.\r\n\r\n")
+    sys.stderr.write("The output is a single pipe | delimited with the CSV option.\r\n")
+    sys.stderr.write("The output type is based on the file extension with invalid extensions writing to a csv file.\r\n\r\n")
+    sys.stderr.write("Example Usage: \r\n")
+    sys.stderr.write("KStrike.py Current.mdb > SYSNAME_Current.txt\r\n") #Writing info to SDTERR
+    sys.stderr.write("KStrike.py C\Windows\System32\LogFiles\SUM\Current.mdb C:\cases\Test\sum.csv \r\n")
+    sys.stderr.write("KStrike.py C\Windows\System32\LogFiles\SUM\Current.mdb C:\cases\Test\sum.json \r\n")
+    sys.stderr.write("KStrike.py C\Windows\System32\LogFiles\SUM\Current.mdb C:\cases\Test\sum.xlsx \r\n")
+    sys.stderr.write("KStrike.py C\Windows\System32\LogFiles\SUM\Current.mdb C:\cases\Test\sum.txt \r\n")
     sys.exit() #A nice clean exit
 #First, we figure the version of python we are running
 if sys.version_info[0] < 3:
@@ -374,6 +442,12 @@ else:
     pythonversion=3
 sys.stderr.write("\r\nPython Version" +str(pythonversion)+" detected\r\n\r\n") #Writing info to SDTERR
 file_object = open(sys.argv[1], "rb") #Opening file
+
+len_of_args = len(sys.argv)
+if len_of_args == 3:
+    out_file = sys.argv[2]
+    out_type = os.path.splitext(out_file)[1]
+
 esedb_file = pyesedb.file() #ESE db needed things
 esedb_file.open_file_object(file_object) #ESE db needed things
 Num_Of_tables = esedb_file.get_number_of_tables() #ESE db needed things
@@ -428,12 +502,12 @@ if (Table_Num_Records > 0 and Table_name == "CLIENTS"): #Another check to ensure
          Check_Column_Type(Table_Record, Column_Type, x, Data_Value) #Arguments to pass to subroutine
        sys.stdout.write("||\r\n") #Last bit of formatting to string
 
-       dates_and_access_str = ''.join(dates_and_accesses).strip(', ')  # TT
-       series_list.append(dates_and_access_str) # TT
-       record = pd.Series(series_list, index=header) # TT
-       df = df.append(record, ignore_index=True) # TT
-       dates_and_access_str = list() # TT
-       series_list = list() # TT
+       dates_and_access_str = ''.join(dates_and_accesses).strip(', ')  
+       series_list.append(dates_and_access_str) 
+       record = pd.Series(series_list, index=header) 
+       df = df.append(record, ignore_index=True) 
+       dates_and_access_str = list() 
+       series_list = list() 
 
        badyeardetector="No" #Changing it back to No
        correlatedtwoaccessmismatchyear="No" #Changing it back to No
@@ -442,14 +516,26 @@ else:
     progresscounter="0"
 esedb_file.close() #Close db
 
-
 max_rows, max_columns = df.shape
-print('Number of Rows {}'.format(str(max_rows)))
-if max_rows > 0:
-    df = df.fillna("")
-    # header = ['Role', 'TenantId', 'TotalAccesses', 'InsertDate', 'LastAccess', 'RawAddress', 'Address_HostName', 'AuthenticatedUserName', 'DatesAndAccesses']
-    test_file = r'C:\cases\Test\sum.csv'
-    df.to_csv(test_file)
+if len_of_args == 3:
+    if max_rows > 0:
+
+        df.fillna("", inplace=True)
+
+        if out_type == '.csv':
+            write_csv(df, out_file)
+
+        elif out_type == '.json':
+            write_json(df, out_file)
+        
+        elif out_type == '.xlsx':
+            write_xlsx(df, out_file)
+        
+        elif out_type == '.txt':
+            write_csv(df, out_file)
+
+        else:
+            write_csv(df, out_file)
 
 
 scriptruntime=(time.time() - StartTime) #Calculating the run time
