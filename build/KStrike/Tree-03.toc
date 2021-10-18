@@ -1,5 +1,0 @@
-('c:\\python39\\lib\\site-packages\\libesedb_python-20210828-py3.9-win-amd64.egg',
- None,
- {'*.pyw', 'EGG-INFO', '*.py', '*.pyd', '*.pyc', '*.cp39-win_amd64.pyd'},
- 'DATA',
- [])
