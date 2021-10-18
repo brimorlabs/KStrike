@@ -25,10 +25,10 @@ The output type is based on the file extension with invalid extensions writing t
 
 Example Usage:
 KStrike.py Current.mdb > SYSNAME_Current.txt
-KStrike.py C\Windows\System32\LogFiles\SUM\Current.mdb sum.csv
-KStrike.py C\Windows\System32\LogFiles\SUM\Current.mdb sum.json
-KStrike.py C\Windows\System32\LogFiles\SUM\Current.mdb sum.xlsx
-KStrike.py C\Windows\System32\LogFiles\SUM\Current.mdb sum.txt
+KStrike.py C\Windows\System32\LogFiles\SUM\Current.mdb SYSNAME_Current.csv
+KStrike.py C\Windows\System32\LogFiles\SUM\Current.mdb SYSNAME_Current.json
+KStrike.py C\Windows\System32\LogFiles\SUM\Current.mdb SYSNAME_Current.xlsx
+KStrike.py C\Windows\System32\LogFiles\SUM\Current.mdb SYSNAME_Current.txt
 ```
 
 This script has been tested on the following systems:
