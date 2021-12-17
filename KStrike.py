@@ -61,6 +61,10 @@ from datetime import datetime
 from binascii import unhexlify
 from struct import unpack
 import time
+from argparse import ArgumentParser
+import openpyxl
+import json
+import os.path
 
 # Declared variables
 kstrikeversionnumber = "20210624" # KStrike Version number
@@ -91,6 +95,26 @@ GUID_Dict = {'{10A9226F-50EE-49D8-A393-9A501D47CE04}':'File Server', '{4116A14D-
             '{DDE30B98-449E-4B93-84A6-EA86AF0B19FE}':'MSMQ','{1479A8C1-9808-411E-9739-2D3C5923E86A}':'Windows Server 2016 DatacenterRemote Desktop Gateway','{90E64AFA-70DB-4FEF-878B-7EB8C868F091}':'Windows ServerRemote Desktop Services',\
             '{2414BC1B-1572-4CD9-9CA5-65166D8DEF3D}':'SQL Server Analysis Services','{8CC0AC85-40F7-4886-9DAB-021519800418}':'Reporting Services'} #This is our GUID dictionary lookup. Add to it as needed
 DNS_Dict = {}
+
+#set up argument parser
+parser = ArgumentParser()
+
+parser.add_argument(
+        '--json', default=False, help='Convert text file into json file.' , nargs='*'
+    )
+parser.add_argument(
+        '--excel', default=False, help='Convert text file into excel file.' , nargs='*'
+    )
+options, unknown = parser.parse_known_args()
+
+# Illegal character remover
+ILLEGAL_CHARACTERS_RE = re.compile(r'[\000-\010]|[\013-\014]|[\016-\037]|[\x00-\x1f\x7f-\x9f]|[\uffff]')
+def illegal_char_remover(data):
+    """Remove ILLEGAL CHARACTER."""
+    if isinstance(data, str):
+        return ILLEGAL_CHARACTERS_RE.sub("", data)
+    else:
+        return data
 
 
 def win_date_bin_to_datetime(win_date_bin): #This converts the datetime field of the CLIENTS table specificaly, it is Windows FILETIME
@@ -282,9 +306,79 @@ def Check_Column_Type(Table_Record, Column_Type, Column_Number, Record_List): #A
 if len(sys.argv) == 1:
     sys.stderr.write("\r\n88      a8P   ad88888ba                      88  88\r\n88    ,88'   d8\"     \"8b  ,d                 \"\"  88\r\n88  ,88\"     Y8,          88                     88\r\n88,d88'      `Y8aaaaa,  MM88MMM  8b,dPPYba,  88  88   ,d8   ,adPPYba,\r\n8888\"88,       `\"\"\"\"\"8b,  88     88P'   \"Y8  88  88 ,a8\"   a8P_____88\r\n88P   Y8b            `8b  88     88          88  8888[     8PP\"\"\"\"\"\"\"\r\n88     \"88,  Y8a     a8P  88,    88          88  88`\"Yba,  \"8b,   ,aa\r\n88       Y8b  \"Y88888P\"   \"Y888  88          88  88   `Y8a  `\"Ybbd8\"'\r\n\r\n") #Writing ASCII art to STDERr
     sys.stderr.write("Version "+str(kstrikeversionnumber)+"\r\n") #Writing version to STDERR
-    sys.stderr.write("\r\nThis script will parse on-disk User Access Logging found on Windows Server 2012\r\nand later systems under the path \"\Windows\System32\LogFiles\SUM\"\r\nThe output is double pipe || delimited\r\n\r\n\r\nExample Usage: KStrike.py Current.mdb > SYSNAME_Current.txt\r\n\r\n") #Writing info to SDTERR
+    sys.stderr.write("\r\nThis script will parse on-disk User Access Logging found on Windows Server 2012\r\nand later systems under the path \"\Windows\System32\LogFiles\SUM\"\r\nThe output is double pipe || delimited\r\n\r\n\r\nExample Usage: KStrike.py Current.mdb > SYSNAME_Current.txt\r\n\r\nTo convert generated text file into Json file or Excel file \r\nUse KStrike.py --json textFileName outputFileName or KStrike.py --excel textFileName outputFileName \r\n\r\nJson Example: KStrike.py --json SYSNAME_Current Current_Json \r\nExcel Example: KStrike.py --excel SYSNAME_Current Current_Excel\r\n\r\n") #Writing info to SDTERR
     sys.exit() #A nice clean exit
-#First, we figure the version of python we are runningif sys.version_info[0] < 3:    pythonversion=2
+
+#convert text file to Json file
+elif options.json:
+    inputFileName = options.json[0] #get input text file name from command line
+    outputFileName = options.json[1] # get output file name from command line
+
+    if os.path.isfile(inputFileName + '.txt'): #check whether a file exists
+        headers = []
+        data = {'KStrike': []}
+        with open (inputFileName+'.txt') as fh:
+        # cleaning empty lines
+            lines = filter(None, (line.rstrip() for line in fh))
+            for l in lines:
+                s = l.split('||')
+                if len(headers) == 0:
+                    headers = s
+                else:
+                    d = {}
+                    for i, v in enumerate(s):
+                        try:
+                            d[headers[i]] = float(v)
+                        except ValueError:
+                            d[headers[i]] = v
+                    data['KStrike'].append(d)
+
+        # creating json file
+        out_file = open(outputFileName + '.json', "w") # create and open json file
+        json.dump(data, out_file, indent = 4, sort_keys = False)# add data to json file
+        out_file.close() #close json file
+    else:
+        print('File not found')
+
+    sys.exit() #A nice clean exit
+
+#convert text file to Excel file
+elif options.excel:
+
+    inputFileName = options.excel[0] #get input text file name from command line
+    outputFileName = options.excel[1] # get output file name from command line
+
+    if os.path.isfile(inputFileName + '.txt'): #check whether a file exists
+        # Open a blank workbook to populate.
+        wb = openpyxl.Workbook()
+        sheet = wb.active # create work sheet
+        col=[] #initialise list to store values
+        tble=[] #initialise list to store row data to insert into excel worksheet
+
+        # Loop through the text files.
+        with open (inputFileName + '.txt') as fh:
+            # cleaning empty lines
+            lines = filter(None, (line.rstrip() for line in fh))
+            i=0
+            for l in lines:
+                row = l.split('||')
+                for j in range(len(row)):       
+                    col.append(illegal_char_remover(row[j]))
+                tble.append(col)
+                col=[] # clear previous row values
+
+        for i in tble:  
+            sheet.append(i)  # add data to excel sheet
+
+        wb.save(outputFileName + '.xlsx')  # Write spreadsheet file
+    else:
+        print('File not found')
+
+    sys.exit() #A nice clean exit
+
+#First, we figure the version of python we are running
+if sys.version_info[0] < 3:
+    pythonversion=2
 else:
     pythonversion=3
 sys.stderr.write("\r\nPython Version" +str(pythonversion)+" detected\r\n\r\n") #Writing info to SDTERR
