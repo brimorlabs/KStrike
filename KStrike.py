@@ -8,10 +8,11 @@ Updates
 2021-04-26 - Added two new GUIDs to lookup table
 2021-02-23 - Built in logic to identify multi-year entries (abnormal, but it can happen)
 2021-02-13 - Processed DNS table (if available) and correlates hostname(s) to IPv4 addresses
+2024-01-09 - Made small changes to line 251 and 276, changing from "(value > 0)" to "(value is not None)" 
 
 DISCLAIMER: 
 
-Copyright (c) 2021, BriMor Labs
+Copyright (c) 2021-2024, BriMor Labs
 All rights reserved.
 
 Redistribution and use in source and binary forms, with or without
@@ -248,7 +249,7 @@ def Check_Column_Type(Table_Record, Column_Type, Column_Number, Record_List): #A
               sys.stdout.write(fullguid+"||") #If it doesn't work, writing the string
     elif (Column_Type == 17): #INTEGER_16BIT_UNSIGNED
        value=Table_Record.get_value_data_as_integer(Column_Number)
-       if ( (value > 0) and ( "Day" in str(Column_Name)) ): #Checking to see if Day is in the field. If so, we will do some converting
+       if ( (value is not None) and ( "Day" in str(Column_Name)) ): #Checking to see if Day is in the field. If so, we will do some converting
            juliandate= str(Column_Name)[3:] #Pulling out Julian Date
            #sys.stdout.write(str(juliandate)+" is Julian Date\r\n")
            global insertdatefourofyear #Pulling the insert date four of year
@@ -273,7 +274,7 @@ def Check_Column_Type(Table_Record, Column_Type, Column_Number, Record_List): #A
                testingd = datetime.datetime.strptime('{} {}'.format(juliandate, insertdatefourofyear),'%j %Y') #Formatting the day to datetime
                fullconvjd = testingd.strftime("%Y-%m-%d") #Another formatting
                sys.stdout.write(str(fullconvjd)+": "+str(value)+", ") #Printing the string
-       elif ( value > 0):
+       elif (value is not None):
            sys.stdout.write(str(Column_Name)+" "+str(value)+",") #Printing the string
        else:
            sys.stdout.write("") #Printing the string
@@ -284,7 +285,9 @@ if len(sys.argv) == 1:
     sys.stderr.write("Version "+str(kstrikeversionnumber)+"\r\n") #Writing version to STDERR
     sys.stderr.write("\r\nThis script will parse on-disk User Access Logging found on Windows Server 2012\r\nand later systems under the path \"\Windows\System32\LogFiles\SUM\"\r\nThe output is double pipe || delimited\r\n\r\n\r\nExample Usage: KStrike.py Current.mdb > SYSNAME_Current.txt\r\n\r\n") #Writing info to SDTERR
     sys.exit() #A nice clean exit
-#First, we figure the version of python we are runningif sys.version_info[0] < 3:    pythonversion=2
+#First, we figure the version of python we are running
+if sys.version_info[0] < 3:
+    pythonversion=2
 else:
     pythonversion=3
 sys.stderr.write("\r\nPython Version" +str(pythonversion)+" detected\r\n\r\n") #Writing info to SDTERR
