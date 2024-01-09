@@ -8,7 +8,7 @@ Updates
 2021-04-26 - Added two new GUIDs to lookup table
 2021-02-23 - Built in logic to identify multi-year entries (abnormal, but it can happen)
 2021-02-13 - Processed DNS table (if available) and correlates hostname(s) to IPv4 addresses
-2024-01-09 - Made small changes to line 251 and 276, changing from "(value > 0)" to "(value is not None)" 
+2024-01-09 - Made small changes to line 251 and 276, changing from "(value > 0)" to "(value is not None)". Added Active Directory Lightweight Directory Service GUID 
 
 DISCLAIMER: 
 
@@ -90,7 +90,8 @@ GUID_Dict = {'{10A9226F-50EE-49D8-A393-9A501D47CE04}':'File Server', '{4116A14D-
             '{C23F1C6A-30A8-41B6-BBF7-F266563DFCD6}':'FTP Server', '{C50FCC83-BC8D-4DF5-8A3D-89D7F80F074B}':'Active Directory Certificate Services', '{D6256CF7-98FB-4EB4-AA18-303F1DA1F770}':'Web Server', \
             '{D8DC1C8E-EA13-49CE-9A68-C9DCA8DB8B33}':'Windows Server Update Services','{AD495FC3-0EAA-413D-BA7D-8B13FA7EC598}':'Active Directory Domain Services','{BD7F7C0D-7C36-4721-AFA8-0BA700E26D9E}':'SQL Server Database Engine',\
             '{DDE30B98-449E-4B93-84A6-EA86AF0B19FE}':'MSMQ','{1479A8C1-9808-411E-9739-2D3C5923E86A}':'Windows Server 2016 DatacenterRemote Desktop Gateway','{90E64AFA-70DB-4FEF-878B-7EB8C868F091}':'Windows ServerRemote Desktop Services',\
-            '{2414BC1B-1572-4CD9-9CA5-65166D8DEF3D}':'SQL Server Analysis Services','{8CC0AC85-40F7-4886-9DAB-021519800418}':'Reporting Services'} #This is our GUID dictionary lookup. Add to it as needed
+            '{2414BC1B-1572-4CD9-9CA5-65166D8DEF3D}':'SQL Server Analysis Services','{8CC0AC85-40F7-4886-9DAB-021519800418}':'Reporting Services','{4AD13311-EC3B-447E-9056-14EDE9FA7052}':'Active Directory Lightweight Directory Services'}
+	    #This is our GUID dictionary lookup. Add to it as needed
 DNS_Dict = {}
 
 
